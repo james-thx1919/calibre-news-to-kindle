@@ -10,14 +10,34 @@ class GlobeAndMail(BasicNewsRecipe):
     __author__     = 'Kovid Goyal/Modified for Subscription'
 
     # --- Login Credentials ---
-    # These lines tell Calibre to show the Username/Password boxes
     needs_subscription = True
     requires_password = True
-    login_url = 'https://www.theglobeandmail.com/login/'
+    # Using the direct registration/login path which is more stable for robots
+    login_url = 'https://www.theglobeandmail.com/real-time/registration/login/'
 
     # This prevents the Globe from seeing Calibre as a bot
     browser_types = ['chrome']
     get_browser_user_agent = lambda x: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+
+    def get_browser(self):
+        br = BasicNewsRecipe.get_browser(self)
+        if self.username and self.password:
+            try:
+                self.log("Attempting to login to The Globe and Mail...")
+                br.open(self.login_url)
+                
+                # Smart Form Selection: Find the form that actually has an email field
+                def select_login_form(form):
+                    return "email" in [str(c.name) for c in form.controls]
+                
+                br.select_form(predicate=select_login_form)
+                br['email'] = self.username
+                br['password'] = self.password
+                br.submit()
+                self.log("Login form submitted.")
+            except Exception as e:
+                self.log.error("Login failed: %s" % str(e))
+        return br
 
     def parse_index(self):
         sections = [
@@ -34,7 +54,7 @@ class GlobeAndMail(BasicNewsRecipe):
             soup = self.index_to_soup(url)
             # This looks for standard links in the main content areas
             for a in soup.findAll('a', href=True):
-                # Only grab links that look like articles (contain a date or specific path)
+                # Only grab links that look like articles
                 if '/article-' in a['href'] or (a['href'].startswith('/') and len(a['href']) > 30):
                     title = self.tag_to_string(a).strip()
                     if title and len(title) > 10:
@@ -42,20 +62,12 @@ class GlobeAndMail(BasicNewsRecipe):
                         articles.append({'title': title, 'url': url})
             
             if articles:
-                ans.append((section_title, articles))
+                # Remove duplicates while preserving order
+                seen = set()
+                final_articles = []
+                for art in articles:
+                    if art['url'] not in seen:
+                        final_articles.append(art)
+                        seen.add(art['url'])
+                ans.append((section_title, final_articles))
         return ans
-
-    # This handles the paywall login
-    def get_browser(self):
-        br = BasicNewsRecipe.get_browser(self)
-        if self.username and self.password:
-            br.open(self.login_url)
-            # Attempts to find the email and password fields by name
-            br.select_form(nr=0)
-            try:
-                br['email'] = self.username
-                br['password'] = self.password
-                br.submit()
-            except:
-                self.log("Login failed: Could not find form fields.")
-        return br
