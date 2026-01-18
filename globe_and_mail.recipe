@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+from calibre.web.feeds.news import BasicNewsRecipe
+
+class GlobeAndMail(BasicNewsRecipe):
+    title          = u'The Globe and Mail'
+    oldest_article = 2
+    max_articles_per_feed = 50
+    auto_cleanup   = True
+    language       = 'en_CA'
+    __author__     = 'Kovid Goyal/Modified for Subscription'
+
+    # --- Login Credentials ---
+    # These lines tell Calibre to show the Username/Password boxes
+    needs_subscription = True
+    requires_password = True
+    login_url = 'https://www.theglobeandmail.com/login/'
+
+    # This prevents the Globe from seeing Calibre as a bot
+    browser_types = ['chrome']
+    get_browser_user_agent = lambda x: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+
+    def parse_index(self):
+        sections = [
+            ('Canada', 'https://www.theglobeandmail.com/canada/'),
+            ('Politics', 'https://www.theglobeandmail.com/politics/'),
+            ('Business', 'https://www.theglobeandmail.com/business/'),
+            ('World', 'https://www.theglobeandmail.com/world/'),
+            ('Opinion', 'https://www.theglobeandmail.com/opinion/')
+        ]
+        
+        ans = []
+        for section_title, url in sections:
+            articles = []
+            soup = self.index_to_soup(url)
+            # This looks for standard links in the main content areas
+            for a in soup.findAll('a', href=True):
+                # Only grab links that look like articles (contain a date or specific path)
+                if '/article-' in a['href'] or (a['href'].startswith('/') and len(a['href']) > 30):
+                    title = self.tag_to_string(a).strip()
+                    if title and len(title) > 10:
+                        url = 'https://www.theglobeandmail.com' + a['href'] if a['href'].startswith('/') else a['href']
+                        articles.append({'title': title, 'url': url})
+            
+            if articles:
+                ans.append((section_title, articles))
+        return ans
+
+    # This handles the paywall login
+    def get_browser(self):
+        br = BasicNewsRecipe.get_browser(self)
+        if self.username and self.password:
+            br.open(self.login_url)
+            # Attempts to find the email and password fields by name
+            br.select_form(nr=0)
+            try:
+                br['email'] = self.username
+                br['password'] = self.password
+                br.submit()
+            except:
+                self.log("Login failed: Could not find form fields.")
+        return br
