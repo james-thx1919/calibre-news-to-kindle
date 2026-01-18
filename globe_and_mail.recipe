@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 from calibre.web.feeds.news import BasicNewsRecipe
-import datetime
 
 class GlobeAndMail(BasicNewsRecipe):
     title          = u'The Globe and Mail'
@@ -9,11 +8,6 @@ class GlobeAndMail(BasicNewsRecipe):
     auto_cleanup   = True
     language       = 'en_CA'
     __author__     = 'Kovid Goyal/Modified'
-
-    # --- Simplified Timestamp ---
-    # This avoids the "strftime" TypeError by returning a simple string
-    def timefmt(self):
-        return datetime.datetime.now().strftime(' [%Y-%m-%d]')
 
     # --- Anti-Blocking & Size Settings ---
     delay = 1
@@ -24,15 +18,13 @@ class GlobeAndMail(BasicNewsRecipe):
     # --- Login Credentials ---
     needs_subscription = True
     requires_password = True
-    # Updated to the base login path to avoid the 404
-    login_url = 'https://www.theglobeandmail.com/news/national/'
+    login_url = 'https://www.theglobeandmail.com/registration/login/'
 
     def get_browser(self):
         br = BasicNewsRecipe.get_browser(self)
         if self.username and self.password:
             try:
-                # We open the national page first, then find the login
-                br.open('https://www.theglobeandmail.com/registration/login/')
+                br.open(self.login_url)
                 br.select_form(predicate=lambda f: "email" in [str(c.name) for c in f.controls])
                 br['email'] = self.username
                 br['password'] = self.password
@@ -61,11 +53,7 @@ class GlobeAndMail(BasicNewsRecipe):
                         articles.append({'title': title, 'url': full_url})
             if articles:
                 seen = set()
-                final_articles = []
-                for art in articles:
-                    if art['url'] not in seen:
-                        final_articles.append(art)
-                        seen.add(art['url'])
+                final_articles = [art for art in articles if not (art['url'] in seen or seen.add(art['url']))]
                 ans.append((section_title, final_articles))
         return ans
 
