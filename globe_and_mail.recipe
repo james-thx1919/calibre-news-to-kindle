@@ -7,15 +7,18 @@ class GlobeAndMail(BasicNewsRecipe):
     max_articles_per_feed = 50
     auto_cleanup   = True
     language       = 'en_CA'
-    __author__     = 'Kovid Goyal/Modified for Subscription'
+    __author__     = 'Kovid Goyal/Modified'
 
+    # --- Anti-Blocking Settings ---
+    delay = 1
+    simultaneous_downloads = 1 # Only 1 at a time to stay under the radar
+    no_stylesheets = True      # Speeds things up and bypasses some blocks
+    
     # --- Login Credentials ---
     needs_subscription = True
     requires_password = True
-    # Using the direct registration/login path which is more stable for robots
-    login_url = 'https://www.theglobeandmail.com/real-time/registration/login/'
+    login_url = 'https://www.theglobeandmail.com/registration/login/'
 
-    # This prevents the Globe from seeing Calibre as a bot
     browser_types = ['chrome']
     get_browser_user_agent = lambda x: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
 
@@ -23,10 +26,10 @@ class GlobeAndMail(BasicNewsRecipe):
         br = BasicNewsRecipe.get_browser(self)
         if self.username and self.password:
             try:
-                self.log("Attempting to login to The Globe and Mail...")
+                self.log("Attempting to login...")
                 br.open(self.login_url)
                 
-                # Smart Form Selection: Find the form that actually has an email field
+                # Search for the form that contains the email field
                 def select_login_form(form):
                     return "email" in [str(c.name) for c in form.controls]
                 
@@ -34,7 +37,7 @@ class GlobeAndMail(BasicNewsRecipe):
                 br['email'] = self.username
                 br['password'] = self.password
                 br.submit()
-                self.log("Login form submitted.")
+                self.log("Login submitted successfully.")
             except Exception as e:
                 self.log.error("Login failed: %s" % str(e))
         return br
@@ -52,9 +55,7 @@ class GlobeAndMail(BasicNewsRecipe):
         for section_title, url in sections:
             articles = []
             soup = self.index_to_soup(url)
-            # This looks for standard links in the main content areas
             for a in soup.findAll('a', href=True):
-                # Only grab links that look like articles
                 if '/article-' in a['href'] or (a['href'].startswith('/') and len(a['href']) > 30):
                     title = self.tag_to_string(a).strip()
                     if title and len(title) > 10:
@@ -62,7 +63,6 @@ class GlobeAndMail(BasicNewsRecipe):
                         articles.append({'title': title, 'url': url})
             
             if articles:
-                # Remove duplicates while preserving order
                 seen = set()
                 final_articles = []
                 for art in articles:
