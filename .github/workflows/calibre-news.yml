@@ -25,6 +25,8 @@ jobs:
       from: ${{ secrets.FROM }}
       to: ${{ secrets.TO }}
       ext: ${{ secrets.format || 'epub' }}
+      username: ${{ secrets.GLOBE_USER }}
+      password: ${{ secrets.GLOBE_PASS }}
     steps:
       - name: Checking Variable
         run: |
@@ -89,11 +91,14 @@ jobs:
           sudo -v && wget -nv -O- $url | sudo sh /dev/stdin
       - name: Converting Ebook
         if: ${{ success() }}
+        env:
+          username: ${{ secrets.GLOBE_USER }}
+          password: ${{ secrets.GLOBE_PASS }}
         run: |
           convert_ebook() {
             ebook_path="${recipe_path%.*}.${ext,,}"
             echo "Converting \"$recipe_path\" > \"$ebook_path\"..."
-            arguments="--authors=\"$author\" --publisher=\"$publisher\""
+            arguments="--authors=\"$author\" --publisher=\"$publisher\" --username=\"$username\" --password=\"$password\""
             cover="covers/${recipe_path%.*}.png"
             if [ -f "$cover" ]; then arguments+=" --cover=\"$cover\""; fi
             echo $arguments | xargs ebook-convert "$recipe_path" "$ebook_path"
