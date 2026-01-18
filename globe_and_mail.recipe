@@ -4,15 +4,16 @@ from calibre.web.feeds.news import BasicNewsRecipe
 class GlobeAndMail(BasicNewsRecipe):
     title          = u'The Globe and Mail'
     oldest_article = 2
-    max_articles_per_feed = 50
+    max_articles_per_feed = 30 # Reduced to stay under Gmail 25MB limit
     auto_cleanup   = True
     language       = 'en_CA'
     __author__     = 'Kovid Goyal/Modified'
 
-    # --- Anti-Blocking Settings ---
+    # --- Anti-Blocking & Size Settings ---
     delay = 1
-    simultaneous_downloads = 1 # Only 1 at a time to stay under the radar
-    no_stylesheets = True      # Speeds things up and bypasses some blocks
+    simultaneous_downloads = 1 
+    no_stylesheets = True
+    no_thumbnails = True # Saves significant space
     
     # --- Login Credentials ---
     needs_subscription = True
@@ -28,11 +29,8 @@ class GlobeAndMail(BasicNewsRecipe):
             try:
                 self.log("Attempting to login...")
                 br.open(self.login_url)
-                
-                # Search for the form that contains the email field
                 def select_login_form(form):
                     return "email" in [str(c.name) for c in form.controls]
-                
                 br.select_form(predicate=select_login_form)
                 br['email'] = self.username
                 br['password'] = self.password
@@ -71,3 +69,15 @@ class GlobeAndMail(BasicNewsRecipe):
                         seen.add(art['url'])
                 ans.append((section_title, final_articles))
         return ans
+
+    # --- New: This shrinks the photos so the file fits in Gmail ---
+    def postprocess_book(self, oeb, opts, log):
+        from calibre.utils.img import resize_image
+        for item in oeb.manifest:
+            if item.media_type.startswith('image/'):
+                try:
+                    img_data = item.data
+                    # Shrink to 600px wide and 60% quality (looks fine on Kindle)
+                    item.data = resize_image(img_data, width=600, height=800, format='JPEG', quality=60)
+                except Exception as e:
+                    log.error('Failed to compress image: %s' % e)
