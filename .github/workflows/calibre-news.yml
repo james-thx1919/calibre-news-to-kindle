@@ -98,7 +98,7 @@ jobs:
           convert_ebook() {
             ebook_path="${recipe_path%.*}.${ext,,}"
             echo "Converting \"$recipe_path\" > \"$ebook_path\"..."
-            arguments="--authors=\"$author\" --publisher=\"$publisher\" --username=\"$username\" --password=\"$password\""
+            arguments="--authors=\"$author\" --publisher=\"$publisher\" --username=\"$username\" --password=\"$password\" --dont-split-on-page-breaks --flow-size 1000"
             cover="covers/${recipe_path%.*}.png"
             if [ -f "$cover" ]; then arguments+=" --cover=\"$cover\""; fi
             echo $arguments | xargs ebook-convert "$recipe_path" "$ebook_path"
