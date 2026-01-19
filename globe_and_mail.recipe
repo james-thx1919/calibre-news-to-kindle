@@ -4,18 +4,32 @@ from calibre.web.feeds.news import BasicNewsRecipe
 class GlobeAndMail(BasicNewsRecipe):
     title          = u'The Globe and Mail'
     oldest_article = 2
-    max_articles_per_feed = 15
+    max_articles_per_feed = 12  # Dropped from 15 to 12 to save space
     auto_cleanup   = True
     language       = 'en_CA'
     __author__     = 'Kovid Goyal/Modified'
 
-    # --- Anti-Blocking & Size Settings ---
+    # --- Cleaning the Clutter (Makes it less clunky) ---
+    # This tells Calibre to only grab the actual story content
+    keep_only_tags = [
+        dict(name='h1'), 
+        dict(attrs={'class': ['c-article-body', 'article-body', 'l-article-layout__content']})
+    ]
+    
+    remove_tags = [
+        dict(attrs={'class': ['c-article-promo', 'c-share-links', 'c-related-stories', 'o-ads', 'c-article-labels']}),
+        dict(name=['aside', 'footer', 'nav'])
+    ]
+
+    # --- Navigation & Size Settings ---
     delay = 1
     simultaneous_downloads = 1
     no_stylesheets = True
     no_thumbnails = True
+    # If the file is STILL too big after this, we can set this to True:
+    no_images = False 
 
-    # --- Login Credentials ---
+    # --- Login ---
     needs_subscription = True
     requires_password = True
     login_url = 'https://www.theglobeandmail.com/registration/login/'
@@ -30,15 +44,15 @@ class GlobeAndMail(BasicNewsRecipe):
                 br['password'] = self.password
                 br.submit()
             except:
-                self.log("Login login attempted...")
+                self.log("Login attempted...")
         return br
 
     def parse_index(self):
+        # I removed 'World' to ensure it fits, you can add it back if needed
         sections = [
             ('Canada', 'https://www.theglobeandmail.com/canada/'),
             ('Politics', 'https://www.theglobeandmail.com/politics/'),
             ('Business', 'https://www.theglobeandmail.com/business/'),
-            ('World', 'https://www.theglobeandmail.com/world/'),
             ('Opinion', 'https://www.theglobeandmail.com/opinion/')
         ]
         ans = []
@@ -48,7 +62,7 @@ class GlobeAndMail(BasicNewsRecipe):
             for a in soup.findAll('a', href=True):
                 if '/article-' in a['href'] or (a['href'].startswith('/') and len(a['href']) > 30):
                     title = self.tag_to_string(a).strip()
-                    if title and len(title) > 10:
+                    if title and len(title) > 15:
                         full_url = 'https://www.theglobeandmail.com' + a['href'] if a['href'].startswith('/') else a['href']
                         articles.append({'title': title, 'url': full_url})
             if articles:
@@ -62,6 +76,7 @@ class GlobeAndMail(BasicNewsRecipe):
         for item in oeb.manifest:
             if item.media_type.startswith('image/'):
                 try:
-                    item.data = resize_image(item.data, width=400, height=600, format='JPEG', quality=40)
+                    # Aggressive compression to beat Gmail
+                    item.data = resize_image(item.data, width=400, height=600, format='JPEG', quality=30)
                 except:
                     pass
